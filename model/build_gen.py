@@ -1,15 +1,12 @@
-import svhn2mnist
-import usps
-import syn2gtrsb
-#import syndig2svhn
+# import syndig2svhn
 
-import lenet
-import resnet
 import alexnet
 import conv3_fc2
+import lenet
+import resnet
+
 
 def Generator(net):
-
     if net == 'lenet':
         return lenet.Feature()
     if net == 'resnet18':
@@ -24,10 +21,7 @@ def Generator(net):
         return conv3_fc2.conv3_fc2(pretrained=False)
 
 
-
-
 def Classifier(net, feat, nclass):
-
     if net == 'lenet':
         return lenet.Predictor()
     if net == 'resnet18' or net == 'resnet50' or net == 'resnet101':
@@ -37,8 +31,8 @@ def Classifier(net, feat, nclass):
     if net == 'conv3_fc2':
         return conv3_fc2.Predictor()
 
-def Uncertainty(net, feat, nclass):
 
+def Uncertainty(net, feat, nclass):
     if net == 'lenet':
         return lenet.Predictor()
     if net == 'resnet18' or net == 'resnet50' or net == 'resnet101':
@@ -47,5 +41,3 @@ def Uncertainty(net, feat, nclass):
         return alexnet._netC_alexnet(nclasses=nclass)
     if net == 'conv3_fc2':
         return conv3_fc2.Uncertainty_Pre()
-
-
