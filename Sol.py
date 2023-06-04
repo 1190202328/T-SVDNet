@@ -222,7 +222,7 @@ class Solver(object):
             # get the target batch
             img_t = data['T'].cuda()
 
-            # 1. get feature embeddings；获得源域的特征
+            # 1. get feature embeddings；获得特征
             regularizer = 0
             feat_s = list()
             for domain_idx in range(self.ndomain - 1):
@@ -240,27 +240,53 @@ class Solver(object):
             feat_t = self.G(img_t)
             feat_t = F.normalize(feat_t, p=2, dim=1)
 
-            # output classification logit
+            # 2. output classification logit；获得分类预测
             logit_s = list()
             for domain_idx in range(self.ndomain - 1):
                 tmp_logit = self.C(feat_s[domain_idx])
+
+                # print(f'feat_s[domain_idx].shape = {feat_s[domain_idx].shape}')
+                # print(f'tmp_logit.shape = {tmp_logit.shape}')
+                # # feat_s[domain_idx].shape = torch.Size([128, 2048])    [B, C]
+                # # tmp_logit.shape = torch.Size([128, 10])               [B, num_class]
+
                 logit_s.append(tmp_logit)
             logit_t = self.C(feat_t)
 
-            # get uncertainty prediction
+            # 3. get uncertainty prediction；获得不准确的预测
             log_var_s = list()
             for domain_idx in range(self.ndomain - 1):
                 tmp_var = self.U(feat_s[domain_idx])
+
+                # print(f'feat_s[domain_idx].shape = {feat_s[domain_idx].shape}')
+                # print(f'tmp_var.shape = {tmp_var.shape}')
+                # # feat_s[domain_idx].shape = torch.Size([128, 2048])    [B, C]
+                # # tmp_var.shape = torch.Size([128, 1])                  [B, 1]
+
                 log_var_s.append(tmp_var)
             log_var_t = self.U(feat_t)
 
-            # predict the psuedo labels for target domain
+            # 4. predict the psuedo labels for target domain；预测目标域的伪标签
             feat_t_, label_t_, log_var_t_ = self.pseudo_label(logit_t, feat_t, log_var_t)
+
+            # print(f'logit_t.shape = {logit_t.shape}')
+            # print(f'feat_t.shape = {feat_t.shape}')
+            # print(f'log_var_t.shape = {log_var_t.shape}')
+            # print(f'feat_t_.shape = {feat_t_.shape}')
+            # print(f'label_t_.shape = {label_t_.shape}')
+            # print(f'log_var_t_.shape = {log_var_t_.shape}')
+            # # logit_t.shape = torch.Size([128, 10])       [B, num_class]
+            # # feat_t.shape = torch.Size([128, 2048])      [B, C]
+            # # log_var_t.shape = torch.Size([128, 1])      [B, 1]
+            # # feat_t_.shape = torch.Size([0, 2048])       [?, C]  符合阈值的特征
+            # # label_t_.shape = torch.Size([0])            [?]     符合阈值的伪标签
+            # # log_var_t_.shape = torch.Size([0, 1])       [?, 1]  符合阈值的置信度
+
             feat_s.append(feat_t_)
             label_s.append(label_t_)
             log_var_s.append(log_var_t_)
 
-            # update the statistics for source and target domains
+            # 5. update the statistics for source and target domains；更新，并且计算损失
             feat_var = list()
             for domain_idx in range(self.ndomain - 1):
                 feat_var.append(feat_s[domain_idx])
@@ -268,12 +294,22 @@ class Solver(object):
             feat_var.append(feat_s[domain_idx + 1])
             self.adj, loss_local = self.update_statistics(feat_var, label_s)
 
-            # ALM
+            # for index in range(len(self.adj)):
+            #     print(f'self.adj[{index}].shape = {self.adj[index].shape}')
+            # print(f'loss_local = {loss_local}')
+            # # self.adj[0].shape = torch.Size([10, 10])    [num_class, num_class]
+            # # self.adj[1].shape = torch.Size([10, 10])
+            # # self.adj[2].shape = torch.Size([10, 10])
+            # # self.adj[3].shape = torch.Size([10, 10])
+            # # self.adj[4].shape = torch.Size([10, 10])
+            # # loss_local = 0.0003490298113320023
+
+            # 6. ALM；计算ALM损失
             loss_alm = 0
             for domain_idx in range(self.ndomain):
                 loss_alm += self.args.mu / 2.0 * (torch.norm(self.adj[domain_idx] - self.aux[domain_idx])) ** 2
 
-            # define classification losses
+            # 7. define classification losses；计算分类损失
             loss_cls_dom = 0
             loss_cls_src = 0
 
@@ -298,18 +334,19 @@ class Solver(object):
 
             loss_cls = loss_cls_dom + loss_cls_src + loss_cls_tgt
 
-            # define total losses
+            # 8. define total losses；综合计算所有损失
             if torch.sum(self.mean[self.args.ndomain - 1]) == 0:
                 loss = loss_cls
             else:
                 loss = loss_cls + loss_alm
-            # back-propagation
+            # 9. back-propagation；反向传播
             self.reset_grad()
             loss.backward(retain_graph=False)
             self.opt_c.step()
             self.opt_g.step()
             self.opt_u.step()
 
+            # 10. 进行后处理，准备下一个epoch
             for domain_idx in range(self.ndomain):
                 self.adj[domain_idx] = self.adj[domain_idx].detach()
                 self.aux[domain_idx] = self.aux[domain_idx].detach()
@@ -325,6 +362,7 @@ class Solver(object):
                 # update parameter mu
                 self.args.mu = min(self.args.mu * self.args.pho, self.args.max_mu)
 
+            # 记录训练信息
             # record training information
             if epoch == 0 and batch_idx == 0:
                 record = open(record_file, 'a')
@@ -354,6 +392,7 @@ class Solver(object):
 
     # per epoch test on target domain
     def test(self, epoch, record_file=None, save_model=False):
+        # 切换测试模式
         self.G.eval()
         self.C.eval()
 
@@ -370,6 +409,9 @@ class Solver(object):
 
             test_loss += -F.nll_loss(logit, label).item()
             pred = logit.max(1)[1]
+
+            # 直接预测
+
             k = label.size()[0]
             correct += pred.eq(label).cpu().sum()
             size += k
