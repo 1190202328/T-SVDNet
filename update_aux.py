@@ -15,11 +15,19 @@ def update_aux(A, rho, eps=1e-5):
 
     A_fft = np.fft.fft(A, axis=2)
     End_Value = np.floor(n_3 / 2).astype(int) + 1
+    # print(f'n_3 = {n_3}')
+    # print(f'A_fft.shape = {A_fft.shape}')
+    # print(f'End_Value = {End_Value}')
+    # # A_fft.shape = (10, 5, 10)
+    # # End_Value = 6
+    # # n_3 = 10
 
     # pdb.set_trace()
     for i in range(End_Value + 1):
         # S_hat <-- S * F
         U, S, V = mt.linalg.svd(A_fft[:, :, i])
+        # print(U)
+
         # U, S, V = np.linalg.svd(A_fft[:, :, i])
 
         # print(f'A_fft[:, :, i].shape = {A_fft[:, :, i].shape}')

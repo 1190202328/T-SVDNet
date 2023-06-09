@@ -354,6 +354,10 @@ class Solver(object):
             if batch_idx % self.args.aux_iter == 0:
                 # update auxiliary variable
                 adj = torch.stack(self.adj, dim=2)
+                # print(f'len(self.adj) = {len(self.adj)}')
+                # print(f'adj.shape = {adj.shape}')
+                # # len(self.adj) = 5
+                # # adj.shape = torch.Size([10, 10, 5])
                 aux = update_aux(adj, self.args.Lambda_global / self.args.mu)
                 aux = list(torch.split(aux, 1, dim=2))
                 for domain_idx in range(self.ndomain):
